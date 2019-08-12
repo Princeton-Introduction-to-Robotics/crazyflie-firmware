@@ -17,6 +17,7 @@ static bool tiltCompensationEnabled = false;
 static attitude_t attitudeDesired;
 static attitude_t rateDesired;
 static float actuatorThrust;
+static float thrust;
 
 void controllerPidInit(void)
 {
@@ -114,6 +115,8 @@ void controllerPid(control_t *control, setpoint_t *setpoint,
     // Reset the calculated YAW angle for rate control
     attitudeDesired.yaw = state->attitude.yaw;
   }
+
+  thrust = state->attitude.roll;
 }
 
 
@@ -125,6 +128,7 @@ LOG_ADD(LOG_FLOAT, yaw,       &attitudeDesired.yaw)
 LOG_ADD(LOG_FLOAT, rollRate,  &rateDesired.roll)
 LOG_ADD(LOG_FLOAT, pitchRate, &rateDesired.pitch)
 LOG_ADD(LOG_FLOAT, yawRate,   &rateDesired.yaw)
+LOG_ADD(LOG_FLOAT, thrust,    &thrust)
 LOG_GROUP_STOP(controller)
 
 PARAM_GROUP_START(controller)

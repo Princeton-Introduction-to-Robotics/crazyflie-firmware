@@ -93,6 +93,8 @@ static float i_error_m_z = 0;
 // Logging variables
 static struct vec z_axis_desired;
 
+static float my_out;
+
 void controllerMellingerReset(void)
 {
   i_error_x = 0;
@@ -295,6 +297,8 @@ void controllerMellinger(control_t *control, setpoint_t *setpoint,
     control->yaw = 0;
     controllerMellingerReset();
   }
+
+  my_out = control->roll;
 }
 
 PARAM_GROUP_START(ctrlMel)
@@ -326,4 +330,5 @@ LOG_ADD(LOG_FLOAT, zdz, &z_axis_desired.z)
 LOG_ADD(LOG_FLOAT, i_err_x, &i_error_x)
 LOG_ADD(LOG_FLOAT, i_err_y, &i_error_y)
 LOG_ADD(LOG_FLOAT, i_err_z, &i_error_z)
+LOG_ADD(LOG_FLOAT, my_out, &my_out)
 LOG_GROUP_STOP(ctrlMel)

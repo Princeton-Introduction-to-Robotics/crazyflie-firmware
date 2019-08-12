@@ -5,6 +5,8 @@
 #include "controller.h"
 #include "controller_pid.h"
 #include "controller_mellinger.h"
+#include "controller_lqr.h"
+#include "controller_experiment.h"
 
 #define DEFAULT_CONTROLLER ControllerTypePID
 static ControllerType currentController = ControllerTypeAny;
@@ -22,6 +24,8 @@ static ControllerFcns controllerFunctions[] = {
   {.init = 0, .test = 0, .update = 0, .name = "None"}, // Any
   {.init = controllerPidInit, .test = controllerPidTest, .update = controllerPid, .name = "PID"},
   {.init = controllerMellingerInit, .test = controllerMellingerTest, .update = controllerMellinger, .name = "Mellinger"},
+  {.init = controllerLQRInit, .test = controllerLQRTest, .update = controllerLQR, .name = "LQR"},
+  {.init = controllerExperimentInit, .test = controllerExperimentTest, .update = controllerExperiment, .name = "Experiment"},
 };
 
 
