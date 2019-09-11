@@ -2,7 +2,7 @@
 
 This is a fork of the standard Crazyflie (CF) firmware for use by the IROM lab. At this point,
 the primary distinction between it and the original CF firmware is the presence of an LQR
-control module.
+control module for use in teaching MAE345.
 
 # Crazyflie Firmware  [![Build Status](https://api.travis-ci.org/bitcraze/crazyflie-firmware.svg)](https://travis-ci.org/bitcraze/crazyflie-firmware)
 
