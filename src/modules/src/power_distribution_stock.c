@@ -33,6 +33,12 @@
 
 static bool motorSetEnable = false;
 
+#ifdef QUAD_FORMATION_X
+  static bool formation = true;
+#else
+  static bool formation = false;
+#endif
+
 static struct {
   uint32_t m1;
   uint32_t m2;
@@ -71,15 +77,23 @@ void powerStop()
   motorsSetRatio(MOTOR_M4, 0);
 }
 
+static uint16_t motor_power_total = 0;
+static int32_t motor_pre_total = 0;
+
 void powerDistribution(const control_t *control)
 {
   #ifdef QUAD_FORMATION_X
     int16_t r = control->roll / 2.0f;
     int16_t p = control->pitch / 2.0f;
+
+    //motor_pre_total = control->thrust - r + p + control->yaw + control->thrust - r - p - control->yaw + control->thrust + r - p + control->yaw + control->thrust + r + p - control->yaw;
     motorPower.m1 = limitThrust(control->thrust - r + p + control->yaw);
     motorPower.m2 = limitThrust(control->thrust - r - p - control->yaw);
     motorPower.m3 =  limitThrust(control->thrust + r - p + control->yaw);
     motorPower.m4 =  limitThrust(control->thrust + r + p - control->yaw);
+
+    //motorPower.m1 = motorPower.m2 = motorPower.m3 = motorPower.m4 = 0;
+    //motor_power_total = motorPower.m1 + motorPower.m2 + motorPower.m3 + motorPower.m4;
   #else // QUAD_FORMATION_NORMAL
     motorPower.m1 = limitThrust(control->thrust + control->pitch +
                                control->yaw);
@@ -113,6 +127,7 @@ PARAM_ADD(PARAM_UINT16, m1, &motorPowerSet.m1)
 PARAM_ADD(PARAM_UINT16, m2, &motorPowerSet.m2)
 PARAM_ADD(PARAM_UINT16, m3, &motorPowerSet.m3)
 PARAM_ADD(PARAM_UINT16, m4, &motorPowerSet.m4)
+PARAM_ADD(PARAM_UINT8, formation, &formation)
 PARAM_GROUP_STOP(ring)
 
 LOG_GROUP_START(motor)
@@ -120,4 +135,6 @@ LOG_ADD(LOG_INT32, m4, &motorPower.m4)
 LOG_ADD(LOG_INT32, m1, &motorPower.m1)
 LOG_ADD(LOG_INT32, m2, &motorPower.m2)
 LOG_ADD(LOG_INT32, m3, &motorPower.m3)
+LOG_ADD(LOG_UINT16, power_total, &motor_power_total)
+LOG_ADD(LOG_INT32, pre_total, &motor_pre_total)
 LOG_GROUP_STOP(motor)

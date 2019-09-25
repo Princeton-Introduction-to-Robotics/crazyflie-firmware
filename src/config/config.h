@@ -63,7 +63,6 @@
   #define portGET_RUN_TIME_COUNTER_VALUE() usecTimestamp()
 #endif
 
-
 // Task priorities. Higher number higher priority
 #define STABILIZER_TASK_PRI     5
 #define SENSORS_TASK_PRI        4

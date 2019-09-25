@@ -46,6 +46,10 @@ static uint16_t motorsConvBitsTo16(uint16_t bits);
 static uint16_t motorsConv16ToBits(uint16_t bits);
 
 uint32_t motor_ratios[] = {0, 0, 0, 0};
+static uint32_t pre_motor[] = {0, 0, 0, 0};
+static uint32_t post_motor[] = {0, 0, 0, 0};
+static uint32_t pre_motor_total;
+static uint32_t post_motor_total;
 
 void motorsPlayTone(uint16_t frequency, uint16_t duration_msec);
 void motorsPlayMelody(uint16_t *notes);
@@ -217,7 +221,14 @@ void motorsSetRatio(uint32_t id, uint16_t ithrust)
       percentage = percentage > 1.0f ? 1.0f : percentage;
       ratio = percentage * UINT16_MAX;
       motor_ratios[id] = ratio;
+      pre_motor[id] = ithrust;
+      post_motor[id] = ithrust;
 
+      pre_motor_total = post_motor_total = 0;
+      for (int i = 0; i < 4; i++) {
+        pre_motor_total += pre_motor[i];
+        pre_motor_total += post_motor[i];
+      }
     }
   #endif
     if (motorMap[id]->drvType == BRUSHLESS)
@@ -302,6 +313,8 @@ void motorsPlayMelody(uint16_t *notes)
   } while (duration != 0);
 }
 LOG_GROUP_START(pwm)
+LOG_ADD(LOG_UINT32, pre_motor_total, &pre_motor_total)
+LOG_ADD(LOG_UINT32, post_motor_total, &post_motor_total)
 LOG_ADD(LOG_UINT32, m1_pwm, &motor_ratios[0])
 LOG_ADD(LOG_UINT32, m2_pwm, &motor_ratios[1])
 LOG_ADD(LOG_UINT32, m3_pwm, &motor_ratios[2])

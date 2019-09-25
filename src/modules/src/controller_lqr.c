@@ -9,14 +9,14 @@
 #include <string.h>
 #include <math.h>
 
-static const float MASS    = 0.03f;     // kg
+static const float MASS    = 0.0313f;     // kg
 static const float GRAVITY = 9.81f;     // m / s^2
-static const float K_F     = 1.938952e-6f; // N / "PWM"
-static const float K_M     = 4.760115E-08f; // Nm / "PWM"
 static const float L       = 0.046f;    // m
 
 
 static float K[4][12];
+static float K_F     = 1.8221205267714052e-06f;  //1.938952e-6f; // N / "PWM"
+static float K_M     = 4.4732910188601685e-08f; // Nm / "PWM"
 
 static float state_vec[12];
 static float setpt_vec[12];
@@ -27,7 +27,8 @@ static int16_t pwm_total;
 static int16_t pwm_int[3];
 static float force_total;
 static float thrust;
-static bool saved_state = false;
+static float set_pitch;
+static uint8_t idx = 0;
 
 /**
 * Converts forces to "PWM" units.
@@ -58,6 +59,15 @@ static inline void forcesToPwm(float *control_vec, float *pwm_vec) {
   pwm_vec[3] = control_vec[3] / (4 * K_M);
 }
 
+
+/**
+* Converts a float to an int16_t without overflow. Instead, either INT16_MIN or
+* INT16_MAX are returned if the input exceeds the limits of the int16_t type.
+*
+* @param[in] in The float that will be converted.
+*
+* @return The converted value.
+*/
 static inline int16_t saturateSignedInt16(float in)
 {
   // Don't use INT16_MIN, because later we may negate it,
@@ -79,8 +89,7 @@ static inline int16_t saturateSignedInt16(float in)
 */
 void controllerLQRInit(void)
 {
-  saved_state = false;
-  consolePrintf("butts\n");
+  memset(pwm_int, 0, 3 * sizeof(int16_t));
 }
 
 /**
@@ -93,6 +102,8 @@ bool controllerLQRTest(void)
   return true;
 }
 
+
+
 void controllerLQR(control_t *control, setpoint_t *setpoint,
                                          const sensorData_t *sensors,
                                          const state_t *state,
@@ -102,15 +113,15 @@ void controllerLQR(control_t *control, setpoint_t *setpoint,
     return;
   }
 
-  state_vec[0]  = state->position.x;
+  state_vec[0]  = -state->position.x;
   state_vec[1]  = state->position.y;
   state_vec[2]  = state->position.z;
 
   state_vec[3]  = radians(state->attitude.roll);
-  state_vec[4]  = -radians(state->attitude.pitch);
+  state_vec[4]  = radians(state->attitude.pitch);
   state_vec[5]  = radians(state->attitude.yaw);
 
-  state_vec[6]  = state->velocity.x;
+  state_vec[6]  = -state->velocity.x;
   state_vec[7]  = state->velocity.y;
   state_vec[8]  = state->velocity.z;
 
@@ -118,65 +129,28 @@ void controllerLQR(control_t *control, setpoint_t *setpoint,
   state_vec[10] = -radians(sensors->gyro.y);
   state_vec[11] = radians(sensors->gyro.z);
 
-  setpt_vec[0]  = setpoint->position.x;
-  setpt_vec[1]  = setpoint->position.y;
+  setpt_vec[0]  = 0.0f;//-setpoint->position.x;
+  setpt_vec[1]  = 0.0f;//setpoint->position.y;
   setpt_vec[2]  = setpoint->position.z;
 
-  setpt_vec[3]  = radians(setpoint->attitude.roll);
-  setpt_vec[4]  = -radians(setpoint->attitude.pitch);
-  setpt_vec[5]  = radians(setpoint->attitude.yaw);
+  setpt_vec[3]  = 0.0f;//radians(setpoint->attitude.roll);
+  setpt_vec[4]  = 0.0f;//radians(setpoint->attitude.pitch);
+  setpt_vec[5]  = 0.0f;//radians(setpoint->attitude.yaw);
 
-  setpt_vec[6]  = setpoint->velocity.x;
-  setpt_vec[7]  = setpoint->velocity.y;
-  setpt_vec[8]  = setpoint->velocity.z;
+  setpt_vec[6]  = 0.0f;//-0.5582;//-setpoint->velocity.x;
+  setpt_vec[7]  = 0.0f;//0.1708f;//setpoint->velocity.y;
+  setpt_vec[8]  = 0.0f;//setpoint->velocity.z;
 
-  setpt_vec[9]  = radians(setpoint->attitudeRate.roll);
-  setpt_vec[10] = -radians(setpoint->attitudeRate.pitch);
-  setpt_vec[11] = radians(setpoint->attitudeRate.yaw);
+  setpt_vec[9]  = 0.0f;//radians(setpoint->attitudeRate.roll);
+  setpt_vec[10] = 0.0f;//-radians(setpoint->attitudeRate.pitch);
+  setpt_vec[11] = 0.0f;//radians(setpoint->attitudeRate.yaw);
 
   for (int i = 0; i < 12; i++) {
     state_error_vec[i] = state_vec[i] - setpt_vec[i];
   }
 
-  //Depending on the setpoint types, we zero out certain enties here.
-  if (setpoint->mode.x == modeVelocity) {
-    setpt_vec[0] = 0.0f;
-  }
-
-  if (setpoint->mode.y == modeVelocity) {
-    setpt_vec[1] = 0.0f;
-  }
-
-  if (setpoint->mode.z == modeVelocity) {
-    setpt_vec[2] = 0.0f;
-  }
-
-  if (setpoint->mode.roll == modeVelocity) {
-    setpt_vec[3] = 0.0f;
-  }
-
-  if (setpoint->mode.pitch == modeVelocity) {
-    setpt_vec[4] = 0.0f;
-  }
-
-  if (setpoint->mode.yaw == modeVelocity) {
-    setpt_vec[5] = 0.0f;
-  }
-
-  if (!saved_state) {
-    saved_state = true;
-
-    union {
-      float f;
-      uint8_t bytes[4];
-    } dummy;
-
-    for (int i = 0; i < 12; i++) {
-      dummy.f = state_error_vec[i];
-      uint8_t *ptr = &(dummy.bytes[0]);
-      eepromWriteBuffer(ptr, 8182 + i, sizeof(uint8_t) * 4);
-    }
-  }
+  //state_error_vec[idx] = state_vec[idx] - setpt_vec[idx];
+  //state_error_vec[0] = state_error_vec[1] = 0.0f;
 
   // Matrix multiplication!
   for (int i = 0; i < 4; i++){
@@ -188,13 +162,15 @@ void controllerLQR(control_t *control, setpoint_t *setpoint,
   }
 
   input_vec[0] += setpoint->thrust + MASS * GRAVITY;
+  //input_vec[0] = 0.0f;
+
   force_total = input_vec[0];
   forcesToPwm(input_vec, pwm_vec);
 
   control->thrust = pwm_vec[0];
-  control->roll   = saturateSignedInt16(2 * pwm_vec[1]);
-  control->pitch  = saturateSignedInt16(2 * pwm_vec[2]);
-  control->yaw    = saturateSignedInt16(pwm_vec[3]);
+  control->roll   = saturateSignedInt16(10.0f * pwm_vec[1]);
+  control->pitch  = saturateSignedInt16(10.0f * pwm_vec[2]);
+  control->yaw    = saturateSignedInt16(-1.0f  * pwm_vec[3]);
 
   pwm_int[0] = control->roll;
   pwm_int[1] = control->pitch;
@@ -204,10 +180,14 @@ void controllerLQR(control_t *control, setpoint_t *setpoint,
 
   pwm_total = (int16_t) (force_total / (4 * K_F));
   thrust = setpoint->thrust;
+  set_pitch = setpoint->velocity.x;
 }
 
 
 PARAM_GROUP_START(ctrlLQR)
+PARAM_ADD(PARAM_FLOAT, k_f, &K_F)
+PARAM_ADD(PARAM_FLOAT, k_m, &K_M)
+
 PARAM_ADD(PARAM_FLOAT, k11, &K[0][0])
 PARAM_ADD(PARAM_FLOAT, k21, &K[1][0])
 PARAM_ADD(PARAM_FLOAT, k31, &K[2][0])
@@ -267,6 +247,8 @@ PARAM_ADD(PARAM_FLOAT, k112, &K[0][11])
 PARAM_ADD(PARAM_FLOAT, k212, &K[1][11])
 PARAM_ADD(PARAM_FLOAT, k312, &K[2][11])
 PARAM_ADD(PARAM_FLOAT, k412, &K[3][11])
+
+PARAM_ADD(PARAM_UINT8, idx, &idx)
 PARAM_GROUP_STOP(ctrlLQR)
 
 LOG_GROUP_START(ctrlLQR)
@@ -296,6 +278,6 @@ LOG_ADD(LOG_INT16, u3_pwm,   &pwm_int[1])
 LOG_ADD(LOG_INT16, u4_pwm,   &pwm_int[2])
 
 
-
+LOG_ADD(LOG_FLOAT, set_pitch, &set_pitch)
 LOG_ADD(LOG_FLOAT, thrust, &thrust)
 LOG_GROUP_STOP(ctrlLQR)
