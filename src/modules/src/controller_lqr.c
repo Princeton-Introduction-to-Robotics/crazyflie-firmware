@@ -9,8 +9,13 @@
 #include <string.h>
 #include <math.h>
 
+//#define __DEBUG_COORDS 0
+
+#ifndef __DEBUG_COORDS
 static const float MASS    = 0.0313f;     // kg
 static const float GRAVITY = 9.81f;     // m / s^2
+#endif
+
 static const float L       = 0.046f;    // m
 
 
@@ -113,16 +118,20 @@ void controllerLQR(control_t *control, setpoint_t *setpoint,
     return;
   }
 
-  state_vec[0]  = -state->position.x;
-  state_vec[1]  = state->position.y;
+  // CHANGED
+  state_vec[0]  = state->position.x;
+  state_vec[1]  = -state->position.y;
+
   state_vec[2]  = state->position.z;
 
   state_vec[3]  = radians(state->attitude.roll);
   state_vec[4]  = radians(state->attitude.pitch);
   state_vec[5]  = radians(state->attitude.yaw);
 
-  state_vec[6]  = -state->velocity.x;
-  state_vec[7]  = state->velocity.y;
+  // CHANGED
+  state_vec[6]  = state->velocity.x;
+  state_vec[7]  = -state->velocity.y;
+
   state_vec[8]  = state->velocity.z;
 
   state_vec[9]  = radians(sensors->gyro.x);
@@ -145,11 +154,17 @@ void controllerLQR(control_t *control, setpoint_t *setpoint,
   setpt_vec[10] = 0.0f;//-radians(setpoint->attitudeRate.pitch);
   setpt_vec[11] = 0.0f;//radians(setpoint->attitudeRate.yaw);
 
+  #ifdef __DEBUG_COORDS
+  for (int i = 0; i < 12; i++) {
+    state_error_vec[i] = 0;
+  }
+  #else
   for (int i = 0; i < 12; i++) {
     state_error_vec[i] = state_vec[i] - setpt_vec[i];
   }
+  #endif
 
-  //state_error_vec[idx] = state_vec[idx] - setpt_vec[idx];
+  state_error_vec[idx] = state_vec[idx] - setpt_vec[idx];
   //state_error_vec[0] = state_error_vec[1] = 0.0f;
 
   // Matrix multiplication!
@@ -161,16 +176,24 @@ void controllerLQR(control_t *control, setpoint_t *setpoint,
     }
   }
 
+  #ifndef __DEBUG_COORDS
   input_vec[0] += setpoint->thrust + MASS * GRAVITY;
-  //input_vec[0] = 0.0f;
+  #endif
 
   force_total = input_vec[0];
   forcesToPwm(input_vec, pwm_vec);
 
   control->thrust = pwm_vec[0];
+
+  #ifndef __DEBUG_COORDS
+  control->roll   = saturateSignedInt16(2.0f * pwm_vec[1]);
+  control->pitch  = saturateSignedInt16(2.0f * pwm_vec[2]);
+  control->yaw    = saturateSignedInt16(-1.0f  * pwm_vec[3]);
+  #else
   control->roll   = saturateSignedInt16(10.0f * pwm_vec[1]);
   control->pitch  = saturateSignedInt16(10.0f * pwm_vec[2]);
   control->yaw    = saturateSignedInt16(-1.0f  * pwm_vec[3]);
+  #endif
 
   pwm_int[0] = control->roll;
   pwm_int[1] = control->pitch;
